@@ -1,0 +1,207 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 Decommission Process, please delete the duplicate SSM document created by the stack when you run the CFN template in Non Prod and Prod.
+Parameters:
+ Docname:
+   Description: SSM Document Name of the Services Account or where the DC is. Needed only for Non-Prod and Prod.
+   Type: String
+ LocalArn:
+   Description: LocalArn value of the CrossAccount Role created.Needed only for  Non-Prod and Prod
+   Type: String
+ Rolename:
+   Description: Rolename of the CrossAccount role created.Needed only for Non-Prod and Prod
+   Type: String
+ instanceid1:
+   Description: Instance id of the DC essenet.com
+   Type: String
+ instanceid2:
+   Description: Instance id of the DC essencehealthcare.COM
+   Type: String
+ instanceid3:
+   Description: Instance id of the DC  forest.domain
+   Type: String
+ instanceid4:
+   Description: Instance id of the DC  prodapp.domain
+   Type: String
+ instanceid5:
+   Description: Instance id of the DC corp.domain
+   Type: String
+ instanceid6:
+   Description: Instance id of the DC  devapp.domain
+   Type: String
+ account:
+   Description: Give the account name i.e. Services,Prod or Nonprod
+   Type: String
+Resources:
+  document:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '1.2'
+        description: Remove computer object by name from Active Directory. This should
+          only be run on a domain controller.
+        parameters:
+          name:
+            type: String
+            description: "(Required) The object name. Do not send multiple objects
+              at once, instead call this multiple times."
+            displayType: textarea
+        runtimeConfig:
+          aws:runPowerShellScript:
+            properties:
+            - id: 0.aws:runPowerShellScript
+              runCommand:
+              - Remove-ADComputer -Identity "{{ name }}" -confirm:$false
+              timeoutSeconds:
+              - '60'
+  DecommissionEC2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile:
+          Fn::Join:
+          - ''
+          - - 'import json
+
+'
+            - 'import boto3
+
+'
+            - 'def lambda_handler(event, context):
+
+'
+            - "  r=event\n"
+            - '  accountid= "'
+            - Ref: account
+            - "\"\n  list=[]\n"
+            - '  id6 = "'
+            - Ref: instanceid6
+            - "\"\n  instance_id=[]\n"
+            - '  id1 = "'
+            - Ref: instanceid1
+            - "\"\n  s=json.dumps(r)\n"
+            - '  id2 = "'
+            - Ref: instanceid2
+            - "\"\n  a=json.loads(s)\n"
+            - '  id3 = "'
+            - Ref: instanceid3
+            - "\"\n  t=a['detail']['instance-id']\n"
+            - "  id=t[4:]\n"
+            - '  id4= "'
+            - Ref: instanceid4
+            - "\"\n  print ('Received id to be deleted')\n"
+            - '  id5 = "'
+            - Ref: instanceid5
+            - "\"\n  print (id)\n"
+            - "  if accountid=='Services':\n"
+            - "    list=[id1,id2,id3,id4,id5,id6]\n"
+            - "    for i in list:\n"
+            - "      if i is not '':\n"
+            - "        instance_id.append(i)\n"
+            - "    ec2=boto3.resource('ec2')\n"
+            - "    ec2instance=ec2.Instance(t)\n"
+            - "    if ec2instance.tags is not None:\n"
+            - "      for tags in ec2instance.tags:\n"
+            - "        tags['Key']=='Hostname' \n"
+            - "        instance_name=tags['Value']\n"
+            - '      response = client.send_command(InstanceIds=instance_id,DocumentName="'
+            -       Ref: document
+            -       "\",Parameters={'name': [instance_name]})\n"
+            - '      response = client.send_command(InstanceIds=instance_id,DocumentName="'
+            -       Ref: document
+            -       "\",Parameters={'name': [id]})\n"
+            - "    else:\n"
+            - '      response = client.send_command(InstanceIds=instance_id,DocumentName="'
+            -    Ref: document
+            -    "\",Parameters={'name': [id]})\n"
+            - "  else:\n"
+            - '    Rolenameac =("'
+            -   Ref: Rolename
+            -   "\")\n    sts_client = boto3.client('sts')\n"
+            - '    LocalRoleArn =("'
+            -   Ref: LocalArn
+            -   "\")\n    assumedRoleObject = sts_client.assume_role(RoleArn=LocalRoleArn,RoleSessionName=Rolenameac)\n"
+            - "    credentials = assumedRoleObject['Credentials']\n"
+            - "    client = boto3.client('ssm',aws_access_key_id = credentials['AccessKeyId'],aws_secret_access_key = credentials['SecretAccessKey'],aws_session_token = credentials['SessionToken'])\n"
+            - "    list=[id1,id2,id3,id4,id5,id6]\n"
+            - "    for i in list:\n"
+            - "      if i is not '':\n"
+            - "        instance_id.append(i)\n"
+            - "    ec2=boto3.resource('ec2')\n"
+            - "    ec2instance=ec2.Instance(t)\n"
+            - "    if ec2instance.tags is not None:\n"
+            - "      for tags in ec2instance.tags:\n"
+            - "        tags['Key']=='Hostname' \n"
+            - "        instance_name=tags['Value']\n"
+            - '      response = client.send_command(InstanceIds=instance_id,DocumentName="'
+            -       Ref: Docname
+            -       "\",Parameters={'name': [instance_name]})\n"
+            - '      response = client.send_command(InstanceIds=instance_id,DocumentName="'
+            -       Ref: Docname
+            -       "\",Parameters={'name': [id]})\n"
+            - "    else:\n"
+            - '      response = client.send_command(InstanceIds=instance_id,DocumentName="'
+            -    Ref: Docname
+            -    "\",Parameters={'name': [id]})\n"
+      Runtime: python3.6
+      Timeout: '25'
+      TracingConfig:
+        Mode: Active
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Catchterminatedinstance
+      EventPattern:
+        source:
+        - aws.ec2
+        detail-type:
+        - EC2 Instance State-change Notification
+        detail:
+          state:
+          - terminated
+      State: ENABLED
+      Targets:
+      - Arn:
+          Fn::GetAtt:
+          - DecommissionEC2
+          - Arn
+        Id: TargetFunctionV1
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: DecommissionEC2
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - EventRule
+        - Arn
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+      - arn:aws:iam::aws:policy/CloudWatchFullAccess
+      - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+      - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      - arn:aws:iam::aws:policy/IAMFullAccess
+      - arn:aws:iam::aws:policy/AdministratorAccess
+Outputs:
+  autodeleteADdocumentName:
+    Description: The SSM Document name
+    Value: !Ref document 
