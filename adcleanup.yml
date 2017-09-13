@@ -12,22 +12,22 @@ Parameters:
    Description: Rolename of the CrossAccount role created.Needed only for Non-Prod and Prod
    Type: String
  instanceid1:
-   Description: Instance id of the DC essenet.com
+   Description: Instance id of the DC
    Type: String
  instanceid2:
-   Description: Instance id of the DC essencehealthcare.COM
+   Description: Instance id of the DC 
    Type: String
  instanceid3:
-   Description: Instance id of the DC  forest.domain
+   Description: Instance id of the DC  
    Type: String
  instanceid4:
-   Description: Instance id of the DC  prodapp.domain
+   Description: Instance id of the DC  
    Type: String
  instanceid5:
-   Description: Instance id of the DC corp.domain
+   Description: Instance id of the DC 
    Type: String
  instanceid6:
-   Description: Instance id of the DC  devapp.domain
+   Description: Instance id of the DC  
    Type: String
  account:
    Description: Give the account name i.e. Services,Prod or Nonprod
